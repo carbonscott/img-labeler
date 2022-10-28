@@ -29,12 +29,14 @@ class Window(QtGui.QMainWindow):
 
         self.setupButtonFunction()
         self.setupButtonShortcut()
-        self.setupMouseModeShortcut()
+        self.setupShortcut()
 
         self.label_item = ImageItem(None)
         self.layout.viewer_img.getView().addItem(self.label_item)
         self.mask_item = ImageItem(None)
         self.layout.viewer_img.getView().addItem(self.mask_item)
+
+        self.requires_overlay = True
 
         self.mask_dict = {}
         self.two_click_pos_list = []
@@ -46,10 +48,31 @@ class Window(QtGui.QMainWindow):
         return None
 
 
-    def setupMouseModeShortcut(self):
-        QtGui.QShortcut(QtCore.Qt.Key_L, self, self.switchToLabelMode)
-        QtGui.QShortcut(QtCore.Qt.Key_M, self, self.switchToMaskMode)
+    def setupShortcut(self):
+        QtGui.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
+        QtGui.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtGui.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
+        QtGui.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
+        QtGui.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
+
+
+    def resetRange(self):
+        self.dispImg(requires_refresh_img = True, requires_refresh_label = False, requires_refresh_mask = False)
+
+
+    def switchOffOverlay(self):
+        if self.requires_overlay:
+            mask = self.mask_dict[self.idx_img]
+            # Overlay label...
+            mask_pixel = np.zeros(mask.shape[-2:] + (4, ), dtype = 'uint8')
+            self.label_item.setImage(mask_pixel, levels = [0, 128])
+            self.mask_item.setImage (mask_pixel, levels = [0, 128])
+
+            self.requires_overlay = False
+        else:
+            self.dispImg(requires_refresh_img = False)
+            self.requires_overlay = True
+
 
 
     def switchOffMouseMode(self):
@@ -168,9 +191,7 @@ class Window(QtGui.QMainWindow):
             label_pixel[:, :, 2][label == 1] = 0
             label_pixel[:, :, 3][label == 1] = 100
 
-            self.layout.viewer_img.removeItem(self.label_item)
-            self.label_item = ImageItem(label_pixel, levels = [0, 128])
-            self.layout.viewer_img.addItem(self.label_item)
+            self.label_item.setImage(label_pixel, levels = [0, 128])
 
         if requires_refresh_mask:
             # Overlay label...
@@ -180,9 +201,7 @@ class Window(QtGui.QMainWindow):
             mask_pixel[:, :, 2][mask == 0] = 255
             mask_pixel[:, :, 3][mask == 0] = 100
 
-            self.layout.viewer_img.removeItem(self.mask_item)
-            self.mask_item = ImageItem(mask_pixel, levels = [0, 128])
-            self.layout.viewer_img.addItem(self.mask_item)
+            self.mask_item.setImage(mask_pixel, levels = [0, 128])
 
         # Display title...
         self.layout.viewer_img.getView().setTitle(f"Sequence number: {self.idx_img}/{self.num_img - 1}")
