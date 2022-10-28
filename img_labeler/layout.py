@@ -15,7 +15,7 @@ class MainLayout(QtGui.QWidget):
         self.area      = DockArea()
         self.dock_dict = self.config_dock()
 
-        self.btn_prev_img, self.btn_next_img, self.btn_label = self.config_button_img()
+        self.btn_prev_img, self.btn_next_img = self.config_button_img()
 
         # Update images in child's class
         self.viewer_img = self.config_image()
@@ -68,15 +68,13 @@ class MainLayout(QtGui.QWidget):
         # Set up buttons...
         btn_prev  = QtGui.QPushButton('Prev')
         btn_next  = QtGui.QPushButton('Next')
-        btn_label = QtGui.QPushButton('Label')
 
         wdgt.addWidget(btn_prev , row = 0, col = 0)
         wdgt.addWidget(btn_next , row = 0, col = 1)
-        wdgt.addWidget(btn_label, row = 0, col = 2)
 
         self.dock_dict["ImgQryButton"].addWidget(wdgt)
 
-        return btn_prev, btn_next, btn_label
+        return btn_prev, btn_next
 
 
     def config_image(self):

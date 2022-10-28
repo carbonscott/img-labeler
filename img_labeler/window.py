@@ -39,7 +39,7 @@ class Window(QtGui.QMainWindow):
         self.mask_dict = {}
         self.two_click_pos_list = []
 
-        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabel)
+        self.proxy_click = None
 
         self.dispImg()
 
@@ -49,6 +49,11 @@ class Window(QtGui.QMainWindow):
     def setupMouseModeShortcut(self):
         QtGui.QShortcut(QtCore.Qt.Key_L, self, self.switchToLabelMode)
         QtGui.QShortcut(QtCore.Qt.Key_M, self, self.switchToMaskMode)
+        QtGui.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
+
+
+    def switchOffMouseMode(self):
+        self.proxy_click = None
 
 
     def switchToLabelMode(self):
@@ -83,7 +88,7 @@ class Window(QtGui.QMainWindow):
 
             ## mask[0, x_b:x_e+1, y_b:y_e+1] = 1 if np.all(mask[0, x_b:x_e+1, y_b:y_e+1] == 0) == True else 0
             mask_selected = mask[0, x_b:x_e+1, y_b:y_e+1]
-            mask_selected= 1 if np.all(mask_selected == 0) == True else 0
+            mask_selected = 1 if np.all(mask_selected == 0) == True else 0
             mask[0, x_b:x_e+1, y_b:y_e+1] = mask_selected
 
             self.dispImg(requires_refresh_img = False, requires_refresh_label = False, requires_refresh_mask = True)
