@@ -40,8 +40,12 @@ class Window(QtGui.QMainWindow):
 
         self.mask_dict = {}
         self.two_click_pos_list = []
+        self.img = None
 
         self.proxy_click = None
+        self.proxy_moved = None
+
+        self.fetchMousePosition()
 
         self.dispImg()
 
@@ -63,6 +67,7 @@ class Window(QtGui.QMainWindow):
     def switchOffOverlay(self):
         if self.requires_overlay:
             mask = self.mask_dict[self.idx_img]
+
             # Overlay label...
             mask_pixel = np.zeros(mask.shape[-2:] + (4, ), dtype = 'uint8')
             self.label_item.setImage(mask_pixel, levels = [0, 128])
@@ -73,6 +78,27 @@ class Window(QtGui.QMainWindow):
             self.dispImg(requires_refresh_img = False)
             self.requires_overlay = True
 
+
+    def fetchMousePosition(self):
+        self.proxy_moved = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseMoved, rateLimit = 30, slot = self.mouseMovedToDisplayPosition)
+
+
+    def mouseMovedToDisplayPosition(self, event):
+        if self.layout.viewer_img.getView().sceneBoundingRect().contains(event[0]):
+            mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0])
+
+            x_pos = mouse_pos.x()
+            y_pos = mouse_pos.y()
+            x = int(x_pos)
+            y = int(y_pos)
+
+            img = self.img[0]
+
+            size_x, size_y = img.shape
+            x = min(max(x, 0), size_x - 1)
+            y = min(max(y, 0), size_y - 1)
+
+            self.layout.viewer_img.getView().setTitle(f"Sequence number: {self.idx_img}/{self.num_img - 1}  |  ({x_pos:6.2f}, {y_pos:6.2f}, {img[x, y]:12.6f})")
 
 
     def switchOffMouseMode(self):
@@ -101,15 +127,14 @@ class Window(QtGui.QMainWindow):
             mask = self.mask_dict[self.idx_img]
             size_x, size_y = mask.shape[-2:]
 
-            x_0 = min(max(x_0, 0), size_x)
-            x_1 = min(max(x_1, 0), size_x)
-            y_0 = min(max(y_0, 0), size_y)
-            y_1 = min(max(y_1, 0), size_y)
+            x_0 = min(max(x_0, 0), size_x - 1)
+            x_1 = min(max(x_1, 0), size_x - 1)
+            y_0 = min(max(y_0, 0), size_y - 1)
+            y_1 = min(max(y_1, 0), size_y - 1)
 
             x_b, x_e = sorted([x_0, x_1])
             y_b, y_e = sorted([y_0, y_1])
 
-            ## mask[0, x_b:x_e+1, y_b:y_e+1] = 1 if np.all(mask[0, x_b:x_e+1, y_b:y_e+1] == 0) == True else 0
             mask_selected = mask[0, x_b:x_e+1, y_b:y_e+1]
             mask_selected = 1 if np.all(mask_selected == 0) == True else 0
             mask[0, x_b:x_e+1, y_b:y_e+1] = mask_selected
@@ -166,6 +191,7 @@ class Window(QtGui.QMainWindow):
         self.idx_img = min(max(0, self.idx_img), self.num_img - 1)
 
         img, label = self.data_manager.get_img(self.idx_img)
+        self.img = img
 
         if self.idx_img not in self.mask_dict:
             mask = np.ones(label.shape, dtype = 'uint8')
@@ -244,6 +270,7 @@ class Window(QtGui.QMainWindow):
 
         if is_ok:
             obj_to_save = ( self.data_manager.data_list,
+                            self.mask_dict,
                             self.data_manager.state_random,
                             self.idx_img,
                             self.timestamp )
@@ -263,9 +290,10 @@ class Window(QtGui.QMainWindow):
             with open(path_pickle, 'rb') as fh:
                 obj_saved = pickle.load(fh)
                 self.data_manager.data_list     = obj_saved[0]
-                self.data_manager.state_random  = obj_saved[1]
-                self.idx_img                    = obj_saved[2]
-                self.timestamp                  = obj_saved[3]
+                self.mask_dict                  = obj_saved[1]
+                self.data_manager.state_random  = obj_saved[2]
+                self.idx_img                    = obj_saved[3]
+                self.timestamp                  = obj_saved[4]
 
             self.dispImg()
 
