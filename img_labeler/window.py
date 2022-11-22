@@ -54,6 +54,7 @@ class Window(QtGui.QMainWindow):
 
     def setupShortcut(self):
         QtGui.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
+        QtGui.QShortcut(QtCore.Qt.Key_K    , self, self.switchToLabelRangeMode)
         QtGui.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtGui.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtGui.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
@@ -109,6 +110,10 @@ class Window(QtGui.QMainWindow):
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabel)
 
 
+    def switchToLabelRangeMode(self):
+        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelRange)
+
+
     def switchToMaskMode(self):
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToMask)
 
@@ -136,10 +141,40 @@ class Window(QtGui.QMainWindow):
             y_b, y_e = sorted([y_0, y_1])
 
             mask_selected = mask[0, x_b:x_e+1, y_b:y_e+1]
-            mask_selected = 1 if np.all(mask_selected == 0) == True else 0
+            mask_selected[:] = 1 if np.all(mask_selected == 0) == True else 0
             mask[0, x_b:x_e+1, y_b:y_e+1] = mask_selected
 
             self.dispImg(requires_refresh_img = False, requires_refresh_label = False, requires_refresh_mask = True)
+            self.two_click_pos_list = []
+
+
+    def mouseClickedToLabelRange(self, event):
+        mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0].scenePos())
+
+        x = int(mouse_pos.x())
+        y = int(mouse_pos.y())
+
+        self.two_click_pos_list.append((x, y))
+
+        if len(self.two_click_pos_list) == 2:
+            (x_0, y_0), (x_1, y_1) = self.two_click_pos_list
+
+            img, mask = self.data_manager.get_img(self.idx_img)
+            size_x, size_y = mask.shape[-2:]
+
+            x_0 = min(max(x_0, 0), size_x - 1)
+            x_1 = min(max(x_1, 0), size_x - 1)
+            y_0 = min(max(y_0, 0), size_y - 1)
+            y_1 = min(max(y_1, 0), size_y - 1)
+
+            x_b, x_e = sorted([x_0, x_1])
+            y_b, y_e = sorted([y_0, y_1])
+
+            mask_selected = mask[0, x_b:x_e+1, y_b:y_e+1]
+            mask_selected[:] = 1 if np.all(mask_selected == 0) == True else 0
+            mask[0, x_b:x_e+1, y_b:y_e+1] = mask_selected
+
+            self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = False)
             self.two_click_pos_list = []
 
 
