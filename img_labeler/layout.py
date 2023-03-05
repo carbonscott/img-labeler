@@ -5,10 +5,10 @@ import os
 import sys
 
 from pyqtgraph          import LayoutWidget, ImageView, PlotItem, ImageItem, ViewBox, GraphicsLayoutWidget
-from pyqtgraph.Qt       import QtGui
+from pyqtgraph.Qt       import QtWidgets
 from pyqtgraph.dockarea import DockArea, Dock
 
-class MainLayout(QtGui.QWidget):
+class MainLayout(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
 
@@ -51,7 +51,7 @@ class MainLayout(QtGui.QWidget):
         wdgt = LayoutWidget()
 
         # Set up label...
-        label = QtGui.QLabel("XXXX")
+        label = QtWidgets.QLabel("XXXX")
 
         wdgt.addWidget(label, row = 0, col = 0)
         self.dock_dict["ImgQryStatus"].addWidget(wdgt)
@@ -66,8 +66,8 @@ class MainLayout(QtGui.QWidget):
         wdgt = LayoutWidget()
 
         # Set up buttons...
-        btn_prev  = QtGui.QPushButton('Prev')
-        btn_next  = QtGui.QPushButton('Next')
+        btn_prev  = QtWidgets.QPushButton('Prev')
+        btn_next  = QtWidgets.QPushButton('Next')
 
         wdgt.addWidget(btn_prev , row = 0, col = 0)
         wdgt.addWidget(btn_next , row = 0, col = 1)

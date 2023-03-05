@@ -7,9 +7,9 @@ import pickle
 import numpy as np
 
 from pyqtgraph    import LabelItem, ImageItem, SignalProxy
-from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
+from pyqtgraph.Qt import QtWidgets, QtCore
 
-class Window(QtGui.QMainWindow):
+class Window(QtWidgets.QMainWindow):
     def __init__(self, layout, data_manager):
         super().__init__()
 
@@ -53,12 +53,12 @@ class Window(QtGui.QMainWindow):
 
 
     def setupShortcut(self):
-        QtGui.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
-        QtGui.QShortcut(QtCore.Qt.Key_K    , self, self.switchToLabelRangeMode)
-        QtGui.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
-        QtGui.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
-        QtGui.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
-        QtGui.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
+        QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToLabelRangeMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
+        QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
 
 
     def resetRange(self):
@@ -213,7 +213,7 @@ class Window(QtGui.QMainWindow):
         self.layout.btn_prev_img.setShortcut("P")
 
         # w/o buttons
-        QtGui.QShortcut(QtCore.Qt.Key_G, self, self.goEventDialog)
+        QtWidgets.QShortcut(QtCore.Qt.Key_G, self, self.goEventDialog)
 
         return None
 
@@ -301,7 +301,7 @@ class Window(QtGui.QMainWindow):
     ### MENU BAR ###
     ################
     def saveStateDialog(self):
-        path_pickle, is_ok = QtGui.QFileDialog.getSaveFileName(self, 'Save File', f'{self.timestamp}.pickle')
+        path_pickle, is_ok = QtWidgets.QFileDialog.getSaveFileName(self, 'Save File', f'{self.timestamp}.pickle')
 
         if is_ok:
             obj_to_save = ( self.data_manager.data_list,
@@ -319,7 +319,7 @@ class Window(QtGui.QMainWindow):
 
 
     def loadStateDialog(self):
-        path_pickle = QtGui.QFileDialog.getOpenFileName(self, 'Open File')[0]
+        path_pickle = QtWidgets.QFileDialog.getOpenFileName(self, 'Open File')[0]
 
         if os.path.exists(path_pickle):
             with open(path_pickle, 'rb') as fh:
@@ -336,7 +336,7 @@ class Window(QtGui.QMainWindow):
 
 
     def goEventDialog(self):
-        idx, is_ok = QtGui.QInputDialog.getText(self, "Enter the event number to go", "Enter the event number to go")
+        idx, is_ok = QtWidgets.QInputDialog.getText(self, "Enter the event number to go", "Enter the event number to go")
 
         if is_ok:
             self.idx_img = int(idx)
