@@ -6,7 +6,7 @@ import sys
 import pickle
 import numpy as np
 
-from pyqtgraph    import LabelItem, ImageItem, SignalProxy
+from pyqtgraph    import LabelItem, ImageItem, SignalProxy, PolyLineROI
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 class Window(QtWidgets.QMainWindow):
@@ -31,16 +31,19 @@ class Window(QtWidgets.QMainWindow):
         self.setupButtonShortcut()
         self.setupShortcut()
 
+        self.mask_dict = {}
+        self.two_click_pos_list = []
+        self.pen_click_pos_list = []
+        self.img = None
+
         self.label_item = ImageItem(None)
         self.layout.viewer_img.getView().addItem(self.label_item)
         self.mask_item = ImageItem(None)
         self.layout.viewer_img.getView().addItem(self.mask_item)
+        self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=True)
+        self.layout.viewer_img.getView().addItem(self.pen_item)
 
         self.requires_overlay = True
-
-        self.mask_dict = {}
-        self.two_click_pos_list = []
-        self.img = None
 
         self.proxy_click = None
         self.proxy_moved = None
@@ -55,6 +58,7 @@ class Window(QtWidgets.QMainWindow):
     def setupShortcut(self):
         QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToLabelRangeMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_J    , self, self.switchToLabelPenMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
@@ -112,6 +116,10 @@ class Window(QtWidgets.QMainWindow):
 
     def switchToLabelRangeMode(self):
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelRange)
+
+
+    def switchToLabelPenMode(self):
+        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelPen)
 
 
     def switchToMaskMode(self):
@@ -176,6 +184,20 @@ class Window(QtWidgets.QMainWindow):
 
             self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = False)
             self.two_click_pos_list = []
+
+
+    def mouseClickedToLabelPen(self, event):
+        mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0].scenePos())
+
+        x = int(mouse_pos.x())
+        y = int(mouse_pos.y())
+
+        self.pen_click_pos_list.append((x, y))
+
+        if len(self.pen_click_pos_list) > 0:
+            self.layout.viewer_img.getView().removeItem(self.pen_item)
+            self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=False)
+            self.layout.viewer_img.getView().addItem(self.pen_item)
 
 
     def mouseClickedToLabel(self, event):
