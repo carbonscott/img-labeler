@@ -36,6 +36,7 @@ class Window(QtWidgets.QMainWindow):
         self.pen_click_pos_list = []
         self.img = None
 
+        self.pen_mode_on = False
         self.label_item = ImageItem(None)
         self.layout.viewer_img.getView().addItem(self.label_item)
         self.mask_item = ImageItem(None)
@@ -58,7 +59,9 @@ class Window(QtWidgets.QMainWindow):
     def setupShortcut(self):
         QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToLabelRangeMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_J    , self, self.switchToLabelPenMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToLabelPenMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToLabelEraserMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.makeMaskLabelPen)
         QtWidgets.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
@@ -119,6 +122,12 @@ class Window(QtWidgets.QMainWindow):
 
 
     def switchToLabelPenMode(self):
+        self.pen_mode_on = True
+        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelPen)
+
+
+    def switchToLabelEraserMode(self):
+        self.pen_mode_on = False
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelPen)
 
 
@@ -189,8 +198,8 @@ class Window(QtWidgets.QMainWindow):
     def mouseClickedToLabelPen(self, event):
         mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0].scenePos())
 
-        x = int(mouse_pos.x())
-        y = int(mouse_pos.y())
+        x = mouse_pos.x()
+        y = mouse_pos.y()
 
         self.pen_click_pos_list.append((x, y))
 
@@ -198,6 +207,36 @@ class Window(QtWidgets.QMainWindow):
             self.layout.viewer_img.getView().removeItem(self.pen_item)
             self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=False)
             self.layout.viewer_img.getView().addItem(self.pen_item)
+
+
+    def makeMaskLabelPen(self):
+        if len(self.pen_click_pos_list) < 3: 
+            self.pen_click_pos_list = []
+            return None
+
+        self.layout.viewer_img.getView().removeItem(self.pen_item)
+        self.pen_click_pos_list.append(self.pen_click_pos_list[0])
+        self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=False)
+        self.layout.viewer_img.getView().addItem(self.pen_item)
+
+        # Find the values and coordinates of the ROI...
+        # mask is an array of 0 or 1
+        img, label = self.data_manager.get_img(self.idx_img)
+        mask = np.ones(label.shape, dtype = 'uint8')
+        mask, coords = self.pen_item.getArrayRegion(mask[0], self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
+
+        # Assign bool values to the ROI area of the label...
+        idx_y, idx_x = coords
+        idx_y -= 0.5
+        idx_x -= 0.5
+        idx_y, idx_x = np.round(coords).astype(int)
+        label[0][idx_y, idx_x] = np.logical_or (label[0][idx_y, idx_x], mask) if self.pen_mode_on else \
+                                 np.logical_and(label[0][idx_y, idx_x], 1 - mask)
+
+        self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = False)
+
+        self.layout.viewer_img.getView().removeItem(self.pen_item)
+        self.pen_click_pos_list = []
 
 
     def mouseClickedToLabel(self, event):
