@@ -62,6 +62,7 @@ class Window(QtWidgets.QMainWindow):
         QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToROILabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.switchToROIMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToROIEraserMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.undoPrevNode)
         QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.connectNodes)
         QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToPointLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToRecLabelMode)
@@ -215,6 +216,14 @@ class Window(QtWidgets.QMainWindow):
             self.layout.viewer_img.getView().removeItem(self.roi_item)
             self.roi_item = PolyLineROI(self.pen_click_pos_list, closed=False)
             self.layout.viewer_img.getView().addItem(self.roi_item)
+
+
+    def undoPrevNode(self):
+        if len(self.pen_click_pos_list) > 0: _ = self.pen_click_pos_list.pop()
+
+        self.layout.viewer_img.getView().removeItem(self.roi_item)
+        self.roi_item = PolyLineROI(self.pen_click_pos_list, closed=False)
+        self.layout.viewer_img.getView().addItem(self.roi_item)
 
 
     def connectNodes(self):
