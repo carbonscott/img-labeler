@@ -36,13 +36,15 @@ class Window(QtWidgets.QMainWindow):
         self.pen_click_pos_list = []
         self.img = None
 
-        self.pen_mode_on = False
+        self.roi_mode_dict = { 1 : 'label', 2 : 'mask' }
+        self.roi_code = 1    # 1 : 'label', 2 : 'mask'
+        self.uses_roi_eraser = False
         self.label_item = ImageItem(None)
+        self.mask_item  = ImageItem(None)
+        self.roi_item   = PolyLineROI(self.pen_click_pos_list, closed=True)
         self.layout.viewer_img.getView().addItem(self.label_item)
-        self.mask_item = ImageItem(None)
         self.layout.viewer_img.getView().addItem(self.mask_item)
-        self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=True)
-        self.layout.viewer_img.getView().addItem(self.pen_item)
+        self.layout.viewer_img.getView().addItem(self.roi_item)
 
         self.requires_overlay = True
 
@@ -57,11 +59,12 @@ class Window(QtWidgets.QMainWindow):
 
 
     def setupShortcut(self):
-        QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToLabelMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToLabelRangeMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToLabelPenMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToLabelEraserMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.makeMaskLabelPen)
+        QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToROILabelMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.switchToROIMaskMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToROIEraserMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.connectNodes)
+        QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToPointLabelMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToRecLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
@@ -113,22 +116,27 @@ class Window(QtWidgets.QMainWindow):
         self.proxy_click = None
 
 
-    def switchToLabelMode(self):
+    def switchToPointLabelMode(self):
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabel)
 
 
-    def switchToLabelRangeMode(self):
+    def switchToRecLabelMode(self):
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelRange)
 
 
-    def switchToLabelPenMode(self):
-        self.pen_mode_on = True
-        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelPen)
+    def switchToROILabelMode(self):
+        self.roi_code = 1
+        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
-    def switchToLabelEraserMode(self):
-        self.pen_mode_on = False
-        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelPen)
+    def switchToROIMaskMode(self):
+        self.roi_code = 2
+        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
+
+
+    def switchToROIEraserMode(self):
+        self.uses_roi_eraser = not self.uses_roi_eraser
+        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
     def switchToMaskMode(self):
@@ -195,7 +203,7 @@ class Window(QtWidgets.QMainWindow):
             self.two_click_pos_list = []
 
 
-    def mouseClickedToLabelPen(self, event):
+    def mouseClickedToLabelROI(self, event):
         mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0].scenePos())
 
         x = mouse_pos.x()
@@ -204,38 +212,50 @@ class Window(QtWidgets.QMainWindow):
         self.pen_click_pos_list.append((x, y))
 
         if len(self.pen_click_pos_list) > 0:
-            self.layout.viewer_img.getView().removeItem(self.pen_item)
-            self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=False)
-            self.layout.viewer_img.getView().addItem(self.pen_item)
+            self.layout.viewer_img.getView().removeItem(self.roi_item)
+            self.roi_item = PolyLineROI(self.pen_click_pos_list, closed=False)
+            self.layout.viewer_img.getView().addItem(self.roi_item)
 
 
-    def makeMaskLabelPen(self):
+    def connectNodes(self):
         if len(self.pen_click_pos_list) < 3: 
             self.pen_click_pos_list = []
             return None
 
-        self.layout.viewer_img.getView().removeItem(self.pen_item)
+        # Connect the starting and end nodes...
         self.pen_click_pos_list.append(self.pen_click_pos_list[0])
-        self.pen_item = PolyLineROI(self.pen_click_pos_list, closed=False)
-        self.layout.viewer_img.getView().addItem(self.pen_item)
+
+        # Plot the polygon again...
+        self.layout.viewer_img.getView().removeItem(self.roi_item)
+        self.roi_item = PolyLineROI(self.pen_click_pos_list, closed=False)
+        self.layout.viewer_img.getView().addItem(self.roi_item)
+
+        # Fetch image, label and mask...
+        img, label = self.data_manager.get_img(self.idx_img)
+        mask = self.mask_dict[self.idx_img]
 
         # Find the values and coordinates of the ROI...
         # mask is an array of 0 or 1
-        img, label = self.data_manager.get_img(self.idx_img)
-        mask = np.ones(label.shape, dtype = 'uint8')
-        mask, coords = self.pen_item.getArrayRegion(mask[0], self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
+        roi_mask = np.ones(label.shape, dtype = 'uint8')
+        roi_mask, coords = self.roi_item.getArrayRegion(roi_mask[0], self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
 
         # Assign bool values to the ROI area of the label...
+        roi_code = self.roi_code
+        roi_mode = self.roi_mode_dict[roi_code]
+        roi = { 'label' : label, 'mask' : mask }[roi_mode]    # On-the-fly dictionary, maybe not a good way for readers
         idx_y, idx_x = coords
         idx_y -= 0.5
         idx_x -= 0.5
         idx_y, idx_x = np.round(coords).astype(int)
-        label[0][idx_y, idx_x] = np.logical_or (label[0][idx_y, idx_x], mask) if self.pen_mode_on else \
-                                 np.logical_and(label[0][idx_y, idx_x], 1 - mask)
 
-        self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = False)
+        # !!! FUTURE IDEA !!! 
+        # Use the 0th-dim for saving multiple labels
+        roi[0][idx_y, idx_x] = np.logical_or (roi[0][idx_y, idx_x], roi_mask) if not self.uses_roi_eraser else \
+                               np.logical_and(roi[0][idx_y, idx_x], 1 - roi_mask)
 
-        self.layout.viewer_img.getView().removeItem(self.pen_item)
+        self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = True)
+
+        self.layout.viewer_img.getView().removeItem(self.roi_item)
         self.pen_click_pos_list = []
 
 
