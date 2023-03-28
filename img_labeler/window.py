@@ -316,8 +316,9 @@ class Window(QtWidgets.QMainWindow):
 
         img, label, mask = img[0], label[0], mask[0]
 
-        vmin = np.mean(img)
-        vmax = vmin + 6 * np.std(img)
+        img_masked = img[mask.astype(bool)]
+        vmin = np.mean(img_masked)
+        vmax = vmin + 6 * np.std(img_masked)
 
         if requires_refresh_img:
             # Display images...
