@@ -62,13 +62,13 @@ class Window(QtWidgets.QMainWindow):
         QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToROILabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.switchToROIMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToROIEraserMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.undoPrevNode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.undoPrevNode)
         QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.connectNodes)
         QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToPointLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToRecLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.switchOffOverlay)
+        QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.switchOffOverlay)
         QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
 
 
@@ -127,11 +127,13 @@ class Window(QtWidgets.QMainWindow):
 
     def switchToROILabelMode(self):
         self.roi_code = 1
+        self.uses_roi_eraser = False    # [COMPRIMISED SOLUION]
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
     def switchToROIMaskMode(self):
         self.roi_code = 2
+        self.uses_roi_eraser = True    # [COMPRIMISED SOLUION]
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
@@ -243,19 +245,25 @@ class Window(QtWidgets.QMainWindow):
         img, label = self.data_manager.get_img(self.idx_img)
         mask = self.mask_dict[self.idx_img]
 
-        # Find the values and coordinates of the ROI...
-        # mask is an array of 0 or 1
-        roi_mask = np.ones(label.shape, dtype = 'uint8')
-        roi_mask, coords = self.roi_item.getArrayRegion(roi_mask[0], self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
-
-        # Assign bool values to the ROI area of the label...
+        # Fetch the right ROI...
         roi_code = self.roi_code
         roi_mode = self.roi_mode_dict[roi_code]
         roi = { 'label' : label, 'mask' : mask }[roi_mode]    # On-the-fly dictionary, maybe not a good way for readers
+
+        # Find the values and coordinates of the ROI...
+        # mask is an array of 0 or 1
+        roi_mask = np.ones(roi.shape[-2:], dtype = 'int8')
+        roi_mask, coords = self.roi_item.getArrayRegion(roi_mask, self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
+
+        # Assign bool values to the ROI area of the label...
         idx_y, idx_x = coords
         idx_y -= 0.5
         idx_x -= 0.5
         idx_y, idx_x = np.round(coords).astype(int)
+
+        size_y, size_x = roi.shape[-2:]
+        idx_y = np.minimum(np.maximum(idx_y, 0), size_y - 1)
+        idx_x = np.minimum(np.maximum(idx_x, 0), size_x - 1)
 
         # !!! FUTURE IDEA !!! 
         # Use the 0th-dim for saving multiple labels
@@ -319,7 +327,7 @@ class Window(QtWidgets.QMainWindow):
         self.img = img
 
         if self.idx_img not in self.mask_dict:
-            mask = np.ones(label.shape, dtype = 'uint8')
+            mask = np.ones(label.shape, dtype = int)
             self.mask_dict[self.idx_img] = mask
         mask = self.mask_dict[self.idx_img]
 
