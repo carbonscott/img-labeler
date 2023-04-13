@@ -430,6 +430,7 @@ class Window(QtWidgets.QMainWindow):
                 self.timestamp                  = obj_saved[4]
 
             self.dispImg()
+            self.num_img = len(self.data_manager.data_list)
 
         return None
 
