@@ -46,15 +46,30 @@ class DataManager:
 
 
 
-class FastData(DataManager):
+class PeakNetData(DataManager):
+    """
+    PeakNet Data (PND) are produced by PeakNet by converting peak information
+    in stream files into a tensor/ndarray.
+
+    Tensor shape: (N, 2, H, W)
+    - N: The number of data points that have been selected.
+    - 2: It refers to a pair of an image and its corresponding label.
+    - H, W: The height and width of both the image and its corresponding label.  
+
+    Main tasks of this class:
+    - Offers `get_img` function that returns a data point tensor with the shape
+      (2, H, W).
+    - Offers an interface that allows users to modify the label tensor with the
+      shape (1, H, W).  The label tensor only supports integer type.
+    """
 
     def __init__(self, config_data):
         super().__init__()
 
         # Imported variables...
-        self.path_fastdata = getattr(config_data, 'path_fastdata' , None)
-        self.username  = getattr(config_data, 'username' , None)
-        self.seed      = getattr(config_data, 'seed'     , None)
+        self.path_pnd = getattr(config_data, 'path_pnd' , None)
+        self.username = getattr(config_data, 'username' , None)
+        self.seed     = getattr(config_data, 'seed'     , None)
 
         # Internal variables...
         self.data_list = []
@@ -67,7 +82,7 @@ class FastData(DataManager):
 
 
     def load_dataset(self):
-        with open(self.path_fastdata, 'rb') as fh:
+        with open(self.path_pnd, 'rb') as fh:
             data_list = pickle.load(fh)
 
         self.data_list = data_list
@@ -76,7 +91,7 @@ class FastData(DataManager):
 
 
     def get_img(self, idx):
-        img, mask = self.data_list[idx]
+        img, label = self.data_list[idx]
 
         # Save random state...
         # Might not be useful for this labeler
@@ -87,4 +102,4 @@ class FastData(DataManager):
             self.state_random = self.img_state_dict[idx]
             self.set_random_state()
 
-        return img, mask
+        return img, label
