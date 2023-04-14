@@ -6,6 +6,8 @@ import sys
 import pickle
 import numpy as np
 
+from .utils import hex_to_rgb
+
 from pyqtgraph    import LabelItem, ImageItem, SignalProxy, PolyLineROI
 from pyqtgraph.Qt import QtWidgets, QtCore
 
@@ -31,19 +33,14 @@ class Window(QtWidgets.QMainWindow):
         self.setupButtonShortcut()
         self.setupShortcut()
 
-        self.mask_dict = {}
         self.two_click_pos_list = []
         self.pen_click_pos_list = []
         self.img = None
 
-        self.roi_mode_dict = { 1 : 'label', 2 : 'mask' }
-        self.roi_code = 1    # 1 : 'label', 2 : 'mask'
         self.uses_roi_eraser = False
         self.label_item = ImageItem(None)
-        self.mask_item  = ImageItem(None)
         self.roi_item   = PolyLineROI(self.pen_click_pos_list, closed=True)
         self.layout.viewer_img.getView().addItem(self.label_item)
-        self.layout.viewer_img.getView().addItem(self.mask_item)
         self.layout.viewer_img.getView().addItem(self.roi_item)
 
         self.requires_overlay = True
@@ -59,32 +56,28 @@ class Window(QtWidgets.QMainWindow):
 
 
     def setupShortcut(self):
+        ## QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.)
         QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToROILabelMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.switchToROIMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToROIEraserMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.undoPrevNode)
         QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.connectNodes)
         QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToPointLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToRecLabelMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_M    , self, self.switchToMaskMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.switchOffOverlay)
         QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
 
 
     def resetRange(self):
-        self.dispImg(requires_refresh_img = True, requires_refresh_label = False, requires_refresh_mask = False)
+        self.dispImg(requires_refresh_img = True, requires_refresh_layers = False)
 
 
     def switchOffOverlay(self):
         if self.requires_overlay:
-            mask = self.mask_dict[self.idx_img]
-
             # Overlay label...
-            mask_pixel = np.zeros(mask.shape[-2:] + (4, ), dtype = 'uint8')
-            self.label_item.setImage(mask_pixel, levels = [0, 128])
-            self.mask_item.setImage (mask_pixel, levels = [0, 128])
-
+            label = self.label
+            empty_mask = np.zeros(label.shape[-2:] + (4, ), dtype = 'uint8')
+            self.label_item.setImage(empty_mask, levels = [0, 128])
             self.requires_overlay = False
         else:
             self.dispImg(requires_refresh_img = False)
@@ -126,14 +119,8 @@ class Window(QtWidgets.QMainWindow):
 
 
     def switchToROILabelMode(self):
-        self.roi_code = 1
+        ## self.roi_code = 1
         self.uses_roi_eraser = False    # [COMPRIMISED SOLUION]
-        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
-
-
-    def switchToROIMaskMode(self):
-        self.roi_code = 2
-        self.uses_roi_eraser = True    # [COMPRIMISED SOLUION]
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
@@ -142,38 +129,19 @@ class Window(QtWidgets.QMainWindow):
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
-    def switchToMaskMode(self):
-        self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToMask)
-
-
-    def mouseClickedToMask(self, event):
+    def mouseClickedToLabel(self, event):
         mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0].scenePos())
 
         x = int(mouse_pos.x())
         y = int(mouse_pos.y())
 
-        self.two_click_pos_list.append((x, y))
+        label = self.label    # (1, H, W)
+        layer_active = self.data_manager.layer_manager.layer_active
+        size_x, size_y = label.shape[-2:]
+        if x < size_x and y < size_y:
+            label[0, x, y] = 0 if label[0, x, y] == layer_active else layer_active
 
-        if len(self.two_click_pos_list) == 2:
-            (x_0, y_0), (x_1, y_1) = self.two_click_pos_list
-
-            mask = self.mask_dict[self.idx_img]
-            size_x, size_y = mask.shape[-2:]
-
-            x_0 = min(max(x_0, 0), size_x - 1)
-            x_1 = min(max(x_1, 0), size_x - 1)
-            y_0 = min(max(y_0, 0), size_y - 1)
-            y_1 = min(max(y_1, 0), size_y - 1)
-
-            x_b, x_e = sorted([x_0, x_1])
-            y_b, y_e = sorted([y_0, y_1])
-
-            mask_selected = mask[0, x_b:x_e+1, y_b:y_e+1]
-            mask_selected[:] = 1 if np.all(mask_selected == 0) == True else 0
-            mask[0, x_b:x_e+1, y_b:y_e+1] = mask_selected
-
-            self.dispImg(requires_refresh_img = False, requires_refresh_label = False, requires_refresh_mask = True)
-            self.two_click_pos_list = []
+        self.dispImg(requires_refresh_img = False, requires_refresh_layers = True)
 
 
     def mouseClickedToLabelRange(self, event):
@@ -187,8 +155,9 @@ class Window(QtWidgets.QMainWindow):
         if len(self.two_click_pos_list) == 2:
             (x_0, y_0), (x_1, y_1) = self.two_click_pos_list
 
-            img, mask = self.data_manager.get_img(self.idx_img)
-            size_x, size_y = mask.shape[-2:]
+            label = self.label    # (1, H, W)
+            layer_active = self.data_manager.layer_manager.layer_active
+            size_x, size_y = label.shape[-2:]
 
             x_0 = min(max(x_0, 0), size_x - 1)
             x_1 = min(max(x_1, 0), size_x - 1)
@@ -198,11 +167,11 @@ class Window(QtWidgets.QMainWindow):
             x_b, x_e = sorted([x_0, x_1])
             y_b, y_e = sorted([y_0, y_1])
 
-            mask_selected = mask[0, x_b:x_e+1, y_b:y_e+1]
-            mask_selected[:] = 1 if np.all(mask_selected == 0) == True else 0
-            mask[0, x_b:x_e+1, y_b:y_e+1] = mask_selected
+            label_selected    = label[0, x_b:x_e+1, y_b:y_e+1]
+            label_selected[:] = layer_active if np.all(label_selected == 0) == True else 0
+            label[0, x_b:x_e+1, y_b:y_e+1] = label_selected
 
-            self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = False)
+            self.dispImg(requires_refresh_img = False, requires_refresh_layers = True)
             self.two_click_pos_list = []
 
 
@@ -242,13 +211,12 @@ class Window(QtWidgets.QMainWindow):
         self.layout.viewer_img.getView().addItem(self.roi_item)
 
         # Fetch image, label and mask...
-        img, label = self.data_manager.get_img(self.idx_img)
-        mask = self.mask_dict[self.idx_img]
+        label = self.label
+        layer_active = self.data_manager.layer_manager.layer_active
 
         # Fetch the right ROI...
-        roi_code = self.roi_code
-        roi_mode = self.roi_mode_dict[roi_code]
-        roi = { 'label' : label, 'mask' : mask }[roi_mode]    # On-the-fly dictionary, maybe not a good way for readers
+        # Shape: (1, H, W);  Value: integers
+        roi = label
 
         # Find the values and coordinates of the ROI...
         # mask is an array of 0 or 1
@@ -267,27 +235,14 @@ class Window(QtWidgets.QMainWindow):
 
         # !!! FUTURE IDEA !!! 
         # Use the 0th-dim for saving multiple labels
-        roi[0][idx_y, idx_x] = np.logical_or (roi[0][idx_y, idx_x], roi_mask) if not self.uses_roi_eraser else \
+        roi[0][idx_y, idx_x] = np.logical_or (roi[0][idx_y, idx_x], layer_active * roi_mask) if not self.uses_roi_eraser else \
                                np.logical_and(roi[0][idx_y, idx_x], 1 - roi_mask)
+        roi[0][idx_y, idx_x] *= layer_active
 
-        self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = True)
+        self.dispImg(requires_refresh_img = False, requires_refresh_layers = True)
 
         self.layout.viewer_img.getView().removeItem(self.roi_item)
         self.pen_click_pos_list = []
-
-
-    def mouseClickedToLabel(self, event):
-        mouse_pos = self.layout.viewer_img.getView().vb.mapSceneToView(event[0].scenePos())
-
-        x = int(mouse_pos.x())
-        y = int(mouse_pos.y())
-
-        img, mask = self.data_manager.get_img(self.idx_img)
-        size_x, size_y = mask.shape[-2:]
-        if x < size_x and y < size_y:
-            mask[0, x, y] = 0 if mask[0, x, y] == 1 else 1
-
-        self.dispImg(requires_refresh_img = False, requires_refresh_label = True, requires_refresh_mask = False)
 
 
     def config(self):
@@ -319,49 +274,46 @@ class Window(QtWidgets.QMainWindow):
     ###############
     ### DIPSLAY ###
     ###############
-    def dispImg(self, requires_refresh_img = True, requires_refresh_label = True, requires_refresh_mask = True):
+    def refresh_layers(self):
+        # Turn label into a layer of shape (1, H, W, 4)...
+        # The type is uint8 for pyqt visualization purpose
+        label  = self.label
+        layers = np.zeros(label.shape + (4, ), dtype = 'uint8')
+
+        # Color them based on layer encoding in the layer metadata...
+        for encode in self.data_manager.layer_manager.layer_order:
+            metadata = self.data_manager.layer_manager.layer_metadata[encode]
+            color_hex = metadata['color']
+
+            if color_hex == '#FFFFFF': continue
+
+            r, g, b = hex_to_rgb(color_hex)
+
+            layers[:, :, :, 0][label == encode] = r
+            layers[:, :, :, 1][label == encode] = g
+            layers[:, :, :, 2][label == encode] = b
+            layers[:, :, :, 3][label == encode] = 100
+
+        self.label_item.setImage(layers[0], levels = [0, 128])
+
+
+    def dispImg(self, requires_refresh_img = True, requires_refresh_layers = True):
         # Let idx_img bound within reasonable range....
         self.idx_img = min(max(0, self.idx_img), self.num_img - 1)
 
         img, label = self.data_manager.get_img(self.idx_img)
         self.img = img
+        self.label = label
 
-        if self.idx_img not in self.mask_dict:
-            mask = np.ones(label.shape, dtype = int)
-            self.mask_dict[self.idx_img] = mask
-        mask = self.mask_dict[self.idx_img]
-
-        img, label, mask = img[0], label[0], mask[0]
-
-        img_masked = img[mask.astype(bool)]
-        vmin = np.mean(img_masked)
-        vmax = vmin + 6 * np.std(img_masked)
+        vmin = np.mean(img)
+        vmax = vmin + 6 * np.std(img)
 
         if requires_refresh_img:
             # Display images...
-            self.layout.viewer_img.setImage(img, levels = [vmin, vmax])
-            ## self.layout.viewer_img.setHistogramRange(0, 1)
+            self.layout.viewer_img.setImage(img[0], levels = [vmin, vmax])
             self.layout.viewer_img.getView().autoRange()
 
-        if requires_refresh_label:
-            # Overlay label...
-            label_pixel = np.zeros(label.shape + (4, ), dtype = 'uint8')
-            label_pixel[:, :, 0][label == 1] = 255
-            label_pixel[:, :, 1][label == 1] = 0
-            label_pixel[:, :, 2][label == 1] = 0
-            label_pixel[:, :, 3][label == 1] = 100
-
-            self.label_item.setImage(label_pixel, levels = [0, 128])
-
-        if requires_refresh_mask:
-            # Overlay label...
-            mask_pixel = np.zeros(mask.shape + (4, ), dtype = 'uint8')
-            mask_pixel[:, :, 0][mask == 0] = 0
-            mask_pixel[:, :, 1][mask == 0] = 0
-            mask_pixel[:, :, 2][mask == 0] = 255
-            mask_pixel[:, :, 3][mask == 0] = 100
-
-            self.mask_item.setImage(mask_pixel, levels = [0, 128])
+        if requires_refresh_layers: self.refresh_layers()
 
         # Display title...
         self.layout.viewer_img.getView().setTitle(f"Sequence number: {self.idx_img}/{self.num_img - 1}")
@@ -404,7 +356,7 @@ class Window(QtWidgets.QMainWindow):
 
         if is_ok:
             obj_to_save = ( self.data_manager.data_list,
-                            self.mask_dict,
+                            self.data_manager.layer_manager,
                             self.data_manager.state_random,
                             self.idx_img,
                             self.timestamp )
@@ -424,7 +376,7 @@ class Window(QtWidgets.QMainWindow):
             with open(path_pickle, 'rb') as fh:
                 obj_saved = pickle.load(fh)
                 self.data_manager.data_list     = obj_saved[0]
-                self.mask_dict                  = obj_saved[1]
+                self.data_manager.layer_manager = obj_saved[1]
                 self.data_manager.state_random  = obj_saved[2]
                 self.idx_img                    = obj_saved[3]
                 self.timestamp                  = obj_saved[4]

@@ -13,6 +13,23 @@ def set_seed(seed):
     return None
 
 
+
+
+def hex_to_rgb(hex_string):
+    # Convert the hex string to an integer
+    hex_int = int(hex_string[hex_string.find('#')+1:], 16)
+
+    # Extract the red, green, and blue values
+    red = (hex_int >> 16) & 0xFF
+    green = (hex_int >> 8) & 0xFF
+    blue = hex_int & 0xFF
+
+    # Return a list of the RGB values
+    return [red, green, blue]
+
+
+
+
 def read_log(file):
     '''Return all lines in the user supplied parameter file without comments.
     ''' 

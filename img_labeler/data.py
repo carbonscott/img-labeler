@@ -67,9 +67,22 @@ class PeakNetData(DataManager):
         super().__init__()
 
         # Imported variables...
-        self.path_pnd = getattr(config_data, 'path_pnd' , None)
-        self.username = getattr(config_data, 'username' , None)
-        self.seed     = getattr(config_data, 'seed'     , None)
+        self.path_pnd      = getattr(config_data, 'path_pnd'     , None)
+        self.username      = getattr(config_data, 'username'     , None)
+        self.seed          = getattr(config_data, 'seed'         , None)
+        self.layer_manager = getattr(config_data, 'layer_manager', None)
+
+        if self.layer_manager is None:
+            layer_metadata = {
+                0 : {'name' : 'bgs', 'color' : '#FFFFFF'},
+                1 : {'name' : 'pks', 'color' : '#FF0000'},
+                2 : {'name' : 'flaw', 'color' : '#00FF00'},
+            }
+            layer_order  = [0, 1, 2]
+            layer_active = 2
+            self.layer_manager = LayerManager(layer_metadata = layer_metadata,
+                                              layer_order    = layer_order,
+                                              layer_active   = layer_active)
 
         # Internal variables...
         self.data_list = []
@@ -103,3 +116,12 @@ class PeakNetData(DataManager):
             self.set_random_state()
 
         return img, label
+
+
+
+
+class LayerManager:
+    def __init__(self, layer_metadata, layer_order, layer_active):
+        self.layer_metadata = layer_metadata
+        self.layer_order    = layer_order
+        self.layer_active   = layer_active
