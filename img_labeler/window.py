@@ -164,7 +164,7 @@ class Window(QtWidgets.QMainWindow):
 
 
     def switchToROIEraserMode(self):
-        self.uses_roi_eraser = not self.uses_roi_eraser
+        self.uses_roi_eraser = True
         self.proxy_click = SignalProxy(self.layout.viewer_img.getView().scene().sigMouseClicked, slot = self.mouseClickedToLabelROI)
 
 
