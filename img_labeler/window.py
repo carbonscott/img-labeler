@@ -8,8 +8,10 @@ import numpy as np
 
 from .utils import hex_to_rgb
 
-from pyqtgraph    import LabelItem, ImageItem, SignalProxy, PolyLineROI
-from pyqtgraph.Qt import QtWidgets, QtCore
+import pyqtgraph as pg
+
+from pyqtgraph    import LabelItem, ImageItem, SignalProxy, PolyLineROI, GraphicsLayoutWidget
+from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 class Window(QtWidgets.QMainWindow):
     def __init__(self, layout, data_manager):
@@ -43,6 +45,8 @@ class Window(QtWidgets.QMainWindow):
         self.layout.viewer_img.getView().addItem(self.label_item)
         self.layout.viewer_img.getView().addItem(self.roi_item)
 
+        self.layer_panel = { 'wgt' : None, 'panel' : None }
+
         self.requires_overlay = True
 
         self.proxy_click = None
@@ -55,8 +59,14 @@ class Window(QtWidgets.QMainWindow):
         return None
 
 
+    def closeEvent(self, event):
+        QtWidgets.QApplication.closeAllWindows()
+        event.accept()
+
+
     def setupShortcut(self):
-        ## QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.)
+        QtWidgets.QShortcut(QtCore.Qt.Key_R    , self, self.selectActiveLayerDialog)
+        QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.showLayerPanel)
         QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToROILabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToROIEraserMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.undoPrevNode)
@@ -66,6 +76,35 @@ class Window(QtWidgets.QMainWindow):
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.switchOffOverlay)
         QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
+
+
+    def showLayerPanel(self):
+        if self.layer_panel['wgt'] is None:
+            wgt = QtWidgets.QWidget()
+            layout = QtWidgets.QVBoxLayout()
+
+            # Add the tree widget to the new window
+            tree = pg.DataTreeWidget()
+            layout.addWidget(tree)
+
+            self.layer_panel['wgt'] = wgt
+            self.layer_panel['panel'] = tree
+
+            wgt.setLayout(layout)
+            wgt.resize(600, 600)
+
+        layer_metadata = self.data_manager.layer_manager['layer_metadata']
+        self.layer_panel['panel'].setData(layer_metadata)
+
+        iterator = QtWidgets.QTreeWidgetItemIterator(self.layer_panel['panel'])
+        while iterator.value():
+            item = iterator.value()
+            key   = item.text(0)
+            value = item.text(2)
+            if key == 'color': item.setBackground(2, QtGui.QColor(value))
+            iterator += 1
+
+        self.layer_panel['wgt'].show()
 
 
     def resetRange(self):
@@ -136,7 +175,7 @@ class Window(QtWidgets.QMainWindow):
         y = int(mouse_pos.y())
 
         label = self.label    # (1, H, W)
-        layer_active = self.data_manager.layer_manager.layer_active
+        layer_active = self.data_manager.layer_manager['layer_active']
         size_x, size_y = label.shape[-2:]
         if x < size_x and y < size_y:
             label[0, x, y] = 0 if label[0, x, y] == layer_active else layer_active
@@ -156,7 +195,7 @@ class Window(QtWidgets.QMainWindow):
             (x_0, y_0), (x_1, y_1) = self.two_click_pos_list
 
             label = self.label    # (1, H, W)
-            layer_active = self.data_manager.layer_manager.layer_active
+            layer_active = self.data_manager.layer_manager['layer_active']
             size_x, size_y = label.shape[-2:]
 
             x_0 = min(max(x_0, 0), size_x - 1)
@@ -212,32 +251,42 @@ class Window(QtWidgets.QMainWindow):
 
         # Fetch image, label and mask...
         label = self.label
-        layer_active = self.data_manager.layer_manager.layer_active
+        layer_active = self.data_manager.layer_manager['layer_active']
 
         # Fetch the right ROI...
         # Shape: (1, H, W);  Value: integers
-        roi = label
 
         # Find the values and coordinates of the ROI...
         # mask is an array of 0 or 1
-        roi_mask = np.ones(roi.shape[-2:], dtype = 'int8')
-        roi_mask, coords = self.roi_item.getArrayRegion(roi_mask, self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
+        canvas = np.ones(label.shape[-2:], dtype = 'int8')
+        roi_patch, coords = self.roi_item.getArrayRegion(canvas, self.layout.viewer_img.getImageItem(), returnMappedCoords = True)
+        roi_patch = roi_patch.astype(bool)
+
+        ## from PyQt5.QtCore import pyqtRemoveInputHook, pyqtRestoreInputHook
+        ## pyqtRemoveInputHook()
+        ## ## pyqtRequestInputHook()  # Restore
+        ## import pdb; pdb.set_trace()
 
         # Assign bool values to the ROI area of the label...
+        # Shape of coords: (2, H_patch, W_patch)
         idx_y, idx_x = coords
         idx_y -= 0.5
         idx_x -= 0.5
         idx_y, idx_x = np.round(coords).astype(int)
 
-        size_y, size_x = roi.shape[-2:]
+        size_y, size_x = label.shape[-2:]
         idx_y = np.minimum(np.maximum(idx_y, 0), size_y - 1)
         idx_x = np.minimum(np.maximum(idx_x, 0), size_x - 1)
 
         # !!! FUTURE IDEA !!! 
         # Use the 0th-dim for saving multiple labels
-        roi[0][idx_y, idx_x] = np.logical_or (roi[0][idx_y, idx_x], layer_active * roi_mask) if not self.uses_roi_eraser else \
-                               np.logical_and(roi[0][idx_y, idx_x], 1 - roi_mask)
-        roi[0][idx_y, idx_x] *= layer_active
+        ## roi[0][idx_y, idx_x] = np.logical_or (roi[0][idx_y, idx_x], layer_active * roi_patch) if not self.uses_roi_eraser else \
+        ##                        np.logical_and(roi[0][idx_y, idx_x], 1 - roi_patch)
+        ## label[0][idx_y, idx_x] = layer_active
+
+        label_patch = label[0][idx_y, idx_x]
+        label_patch[roi_patch] = layer_active if not self.uses_roi_eraser else 0
+        label[0][idx_y, idx_x] = label_patch
 
         self.dispImg(requires_refresh_img = False, requires_refresh_layers = True)
 
@@ -281,8 +330,8 @@ class Window(QtWidgets.QMainWindow):
         layers = np.zeros(label.shape + (4, ), dtype = 'uint8')
 
         # Color them based on layer encoding in the layer metadata...
-        for encode in self.data_manager.layer_manager.layer_order:
-            metadata = self.data_manager.layer_manager.layer_metadata[encode]
+        for encode in self.data_manager.layer_manager['layer_order']:
+            metadata = self.data_manager.layer_manager['layer_metadata'][encode]
             color_hex = metadata['color']
 
             if color_hex == '#FFFFFF': continue
@@ -364,7 +413,7 @@ class Window(QtWidgets.QMainWindow):
             with open(path_pickle, 'wb') as fh:
                 pickle.dump(obj_to_save, fh, protocol = pickle.HIGHEST_PROTOCOL)
 
-            print(f"State saved")
+            print(f"{path_pickle} saved")
 
         return None
 
@@ -383,6 +432,39 @@ class Window(QtWidgets.QMainWindow):
 
             self.dispImg()
             self.num_img = len(self.data_manager.data_list)
+
+        return None
+
+
+    def saveDataDialog(self):
+        path_npy, is_ok = QtWidgets.QFileDialog.getSaveFileName(self, 'Save File', f'{self.timestamp}.data.npy')
+
+        if is_ok:
+            obj_to_save = np.save(path_npy, self.data_manager.data_list)
+
+            print(f"{path_npy} is saved")
+
+        return None
+
+
+    def loadDataDialog(self):
+        path_npy = QtWidgets.QFileDialog.getOpenFileName(self, 'Load Data')[0]
+
+        if os.path.exists(path_npy):
+            self.data_manager.data_list = np.load(path_npy)
+
+            print(f"{path_npy} is loaded.")
+            self.dispImg()
+            self.num_img = len(self.data_manager.data_list)
+
+        return None
+
+
+    def selectActiveLayerDialog(self):
+        idx, is_ok = QtWidgets.QInputDialog.getText(self, "Activate label", "Activate label")
+
+        if is_ok and int(idx) in self.data_manager.layer_manager['layer_metadata']:
+            self.data_manager.layer_manager['layer_active']= int(idx)
 
         return None
 
@@ -410,6 +492,8 @@ class Window(QtWidgets.QMainWindow):
 
         fileMenu.addAction(self.loadAction)
         fileMenu.addAction(self.saveAction)
+        fileMenu.addAction(self.loadDataAction)
+        fileMenu.addAction(self.saveDataAction)
 
         # Go menu
         goMenu = QtWidgets.QMenu("&Go", self)
@@ -427,6 +511,12 @@ class Window(QtWidgets.QMainWindow):
         self.saveAction = QtWidgets.QAction(self)
         self.saveAction.setText("&Save State")
 
+        self.loadDataAction = QtWidgets.QAction(self)
+        self.loadDataAction.setText("&Load Data")
+
+        self.saveDataAction = QtWidgets.QAction(self)
+        self.saveDataAction.setText("&Save Data")
+
         self.goAction = QtWidgets.QAction(self)
         self.goAction.setText("&Event")
 
@@ -436,6 +526,8 @@ class Window(QtWidgets.QMainWindow):
     def connectAction(self):
         self.loadAction.triggered.connect(self.loadStateDialog)
         self.saveAction.triggered.connect(self.saveStateDialog)
+        self.loadDataAction.triggered.connect(self.loadDataDialog)
+        self.saveDataAction.triggered.connect(self.saveDataDialog)
 
         self.goAction.triggered.connect(self.goEventDialog)
 

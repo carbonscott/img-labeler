@@ -7,7 +7,7 @@ import numpy as np
 import random
 from datetime import datetime
 
-from img_labeler.utils  import set_seed
+from .utils  import set_seed
 
 class DataManager:
     def __init__(self):
@@ -74,15 +74,16 @@ class PeakNetData(DataManager):
 
         if self.layer_manager is None:
             layer_metadata = {
-                0 : {'name' : 'bgs', 'color' : '#FFFFFF'},
-                1 : {'name' : 'pks', 'color' : '#FF0000'},
-                2 : {'name' : 'flaw', 'color' : '#00FF00'},
+                0 : {'name' : 'background' , 'color' : '#FFFFFF'},
+                1 : {'name' : 'peak'       , 'color' : '#FF0000'},
+                2 : {'name' : 'bad pixel'  , 'color' : '#00FF00'},
+                3 : {'name' : 'do not pred', 'color' : '#0000FF'},
             }
-            layer_order  = [0, 1, 2]
-            layer_active = 2
-            self.layer_manager = LayerManager(layer_metadata = layer_metadata,
-                                              layer_order    = layer_order,
-                                              layer_active   = layer_active)
+            layer_order  = [0, 1, 2, 3]
+            layer_active = 1
+            self.layer_manager = { 'layer_metadata' : layer_metadata,
+                                   'layer_order'    : layer_order,
+                                   'layer_active'   : layer_active, }
 
         # Internal variables...
         self.data_list = []
@@ -116,12 +117,3 @@ class PeakNetData(DataManager):
             self.set_random_state()
 
         return img, label
-
-
-
-
-class LayerManager:
-    def __init__(self, layer_metadata, layer_order, layer_active):
-        self.layer_metadata = layer_metadata
-        self.layer_order    = layer_order
-        self.layer_active   = layer_active

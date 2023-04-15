@@ -4,7 +4,7 @@
 import os
 import sys
 
-from pyqtgraph          import LayoutWidget, ImageView, PlotItem, ImageItem, ViewBox, GraphicsLayoutWidget
+from pyqtgraph          import LayoutWidget, ImageView, PlotItem, ImageItem, ViewBox
 from pyqtgraph.Qt       import QtWidgets
 from pyqtgraph.dockarea import DockArea, Dock
 
