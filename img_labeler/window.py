@@ -66,13 +66,13 @@ class Window(QtWidgets.QMainWindow):
 
     def setupShortcut(self):
         QtWidgets.QShortcut(QtCore.Qt.Key_R    , self, self.selectActiveLayerDialog)
-        QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.showLayerPanel)
+        QtWidgets.QShortcut(QtCore.Qt.Key_V    , self, self.showLayerPanel)
         QtWidgets.QShortcut(QtCore.Qt.Key_D    , self, self.switchToROILabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_E    , self, self.switchToROIEraserMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.undoPrevNode)
         QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.connectNodes)
-        QtWidgets.QShortcut(QtCore.Qt.Key_L    , self, self.switchToPointLabelMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_K    , self, self.switchToRecLabelMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.switchToPointLabelMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_G    , self, self.switchToRecLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.switchOffOverlay)
         QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
