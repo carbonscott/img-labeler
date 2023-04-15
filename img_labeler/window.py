@@ -48,6 +48,7 @@ class Window(QtWidgets.QMainWindow):
         self.layer_panel = { 'wgt' : None, 'panel' : None }
 
         self.requires_overlay = True
+        self.uses_auto_range = True
 
         self.proxy_click = None
         self.proxy_moved = None
@@ -76,6 +77,7 @@ class Window(QtWidgets.QMainWindow):
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.switchOffOverlay)
         QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
+        QtWidgets.QShortcut(QtCore.Qt.Key_T    , self, self.toggleAutoRange)
 
 
     def showLayerPanel(self):
@@ -109,6 +111,11 @@ class Window(QtWidgets.QMainWindow):
 
     def resetRange(self):
         self.dispImg(requires_refresh_img = True, requires_refresh_layers = False)
+
+
+    def toggleAutoRange(self):
+        self.uses_auto_range = not self.uses_auto_range
+        print(f"Auto range: {self.uses_auto_range}")
 
 
     def switchOffOverlay(self):
@@ -356,11 +363,11 @@ class Window(QtWidgets.QMainWindow):
 
         vmin = np.mean(img)
         vmax = vmin + 6 * np.std(img)
+        levels = [vmin, vmax]
 
         if requires_refresh_img:
             # Display images...
-            self.layout.viewer_img.setImage(img[0], levels = [vmin, vmax])
-            self.layout.viewer_img.getView().autoRange()
+            self.layout.viewer_img.setImage(img[0], levels = levels, autoRange = self.uses_auto_range)
 
         if requires_refresh_layers: self.refresh_layers()
 
