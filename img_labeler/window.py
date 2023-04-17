@@ -73,7 +73,7 @@ class Window(QtWidgets.QMainWindow):
         QtWidgets.QShortcut(QtCore.Qt.Key_Z    , self, self.undoPrevNode)
         QtWidgets.QShortcut(QtCore.Qt.Key_C    , self, self.connectNodes)
         QtWidgets.QShortcut(QtCore.Qt.Key_F    , self, self.switchToPointLabelMode)
-        QtWidgets.QShortcut(QtCore.Qt.Key_G    , self, self.switchToRecLabelMode)
+        QtWidgets.QShortcut(QtCore.Qt.Key_B    , self, self.switchToRecLabelMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_Space, self, self.switchOffMouseMode)
         QtWidgets.QShortcut(QtCore.Qt.Key_S    , self, self.switchOffOverlay)
         QtWidgets.QShortcut(QtCore.Qt.Key_A    , self, self.resetRange)
