@@ -76,8 +76,8 @@ class PeakNetData(DataManager):
             layer_metadata = {
                 0 : {'name' : 'background' , 'color' : '#FFFFFF'},
                 1 : {'name' : 'peak'       , 'color' : '#FF0000'},
-                2 : {'name' : 'bad pixel'  , 'color' : '#00FF00'},
-                3 : {'name' : 'do not pred', 'color' : '#0000FF'},
+                2 : {'name' : 'do not pred', 'color' : '#0000FF'},
+                3 : {'name' : 'bad pixel'  , 'color' : '#00FF00'},
             }
             layer_order  = [0, 1, 2, 3]
             layer_active = 1
