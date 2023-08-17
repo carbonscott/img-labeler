@@ -1,14 +1,12 @@
 # X-ray diffraction peak labeler
 
-![](./figures/demo.png)
-
 A GUI for viewing/labeling X-ray diffraction peaks.
 
 
 ## Install with `pip`
 
 ```
-pip install git+https://github.com/carbonscott/img-labeler --upgrade --user
+pip install git+https://github.com/carbonscott/manual-peak-labeler --upgrade --user
 ```
 
 
